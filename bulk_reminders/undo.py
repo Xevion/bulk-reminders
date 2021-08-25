@@ -1,6 +1,8 @@
 import json
 import os
-from typing import List
+from typing import Iterator, List
+
+import jsonpickle
 
 
 class HistoryManager(object):
@@ -18,13 +20,13 @@ class HistoryManager(object):
 
     def load(self) -> None:
         """Load data from the undo history file"""
-        with open(self.file, 'r') as history:
-            self.stages = json.load(history)
+        with open(self.file, 'r') as file:
+            self.stages = jsonpickle.decode(file.read())
 
     def save(self) -> None:
         """Save data to the undo history file."""
-        with open(self.file, 'w') as history:
-            json.dump(self.stages, history)
+        with open(self.file, 'w') as file:
+            file.write(jsonpickle.encode(self.stages))
 
     def getTotal(self) -> int:
         """Returns the total number of undoable events known."""
@@ -32,16 +34,39 @@ class HistoryManager(object):
 
     def exists(self, id: 'IDPair') -> int:
         """Check if a given ID exists anywhere in the undo history data. Returns the stage index or -1 if it wasn't found."""
+        print(f'Checking for {id} in undo history')
         for stage in self.stages:
-            for stageID in stage.events:
-                if id == stageID:
+            for undoable in stage.events:
+                if id == undoable.eventID:
                     return stage.index
         return -1
 
+    def all_pairs(self) -> Iterator['IDPair']:
+        """Generator for every IDPair object within the master HistoryManager"""
+        for stage in self.stages:
+            for event in stage.events:
+                yield event
+
+    def __len__(self) -> int:
+        """Returns the number of stages"""
+        return len(self.stages)
+
+    def nextIndex(self):
+        """Gets the next index (for a new stage)"""
+        if len(self.stages) == 0:
+            return 0
+        return self.stages[0].index + 1
+
+    def addStage(self, newStage: 'Stage'):
+        """Adds and inserts a new Stage at the start of the history."""
+        self.stages.insert(0, newStage)
+        self.save()
+
 
 class Stage(object):
-    def __init__(self, index: int) -> None:
+    def __init__(self, index: int, commonCalendar: str) -> None:
         self.index = index
+        self.commonCalendar = commonCalendar
         self.events: List[IDPair] = []
 
     def __contains__(self, item) -> bool:
@@ -65,3 +90,8 @@ class IDPair(object):
         elif type(other) is tuple:
             return len(other) == 2 and other == (self.calendarID, self.eventID)
         return False
+
+    def __hash__(self):
+        """Returns a hash value for the IDPair"""
+        return hash((self.calendarID, self.eventID))
+
