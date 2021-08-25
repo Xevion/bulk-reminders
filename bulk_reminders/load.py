@@ -42,8 +42,12 @@ class LoadDialog(QDialog, Ui_Dialog):
         """Parse the events entered into the dialog"""
         self.spinner.hide()
         results = [result.groups() for result in re.finditer(REGEX, self.plainTextEdit.toPlainText())]
-        self.eventCountLabel.setText(f'{len(results)} group{"s" if len(results) != 1 else ""} found.')
-        self.parsed = list(map(Event.parse_raw, results))
+        resultsText = f'{len(results)} group{"s" if len(results) != 1 else ""} found.'
+        try:
+            self.parsed = list(map(Event.parse_raw, results))
+        except ValueError:
+            resultsText += ' Data error.'
+        self.eventCountLabel.setText(resultsText)
 
     def edited(self) -> None:
         """Prepare a timer to be fired to parse the edited text"""
