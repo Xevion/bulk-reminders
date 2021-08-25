@@ -32,12 +32,12 @@ class HistoryManager(object):
         """Returns the total number of undoable events known."""
         return sum(len(stage) for stage in self.stages)
 
-    def exists(self, id: 'IDPair') -> int:
-        """Check if a given ID exists anywhere in the undo history data. Returns the stage index or -1 if it wasn't found."""
-        print(f'Checking for {id} in undo history')
+    def exists(self, eventID: 'IDPair') -> int:
+        """Check if a given Event ID exists anywhere in the undo history data. Returns the stage index or -1 if it wasn't found."""
+        print(f'Checking for {eventID} in undo history')
         for stage in self.stages:
             for undoable in stage.events:
-                if id == undoable.eventID:
+                if eventID == undoable.eventID:
                     return stage.index
         return -1
 
