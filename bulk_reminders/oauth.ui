@@ -14,7 +14,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dialog</string>
+   <string>OAuth 2.0 Flow</string>
   </property>
   <property name="sizeGripEnabled">
    <bool>false</bool>

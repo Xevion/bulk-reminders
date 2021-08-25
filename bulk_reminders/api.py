@@ -2,10 +2,11 @@ from __future__ import print_function
 
 import datetime
 import os.path
+import re
 import traceback
 from typing import Any, Iterator, List, Optional, Tuple, Union
 
-from PyQt5 import QtCore, QtGui
+from PyQt5 import QtGui
 from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
 from dateutil.parser import isoparse
 from google.auth.transport.requests import Request
@@ -16,6 +17,9 @@ from tzlocal import get_localzone
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
+TIME_REGEX = re.compile(r'\d{2}:\d{2}(?:AM|PM)')
+DATE_FORMAT = '%Y-%m-%d'
+DATETIME_FORMAT = DATE_FORMAT + ' %H:%M%p'
 
 
 class Calendar(object):
@@ -134,3 +138,20 @@ class Event(object):
         table.setItem(row, 1, QTableWidgetItem('Foreign'))
         table.setItem(row, 2, QTableWidgetItem(self.start.strftime(formatString)))
         table.setItem(row, 3, QTableWidgetItem(self.end.strftime(formatString)))
+
+    @classmethod
+    def parse_raw(self, input: Tuple[str]) -> 'Event':
+        """Takes in input that has been separated by a RegEx expression into groups and creates a Event object"""
+        first_time = re.match(TIME_REGEX, input[2]) is not None
+        second_time = re.match(TIME_REGEX, input[3 + (1 if first_time else 0)])
+        second_index = 2 + (1 if first_time else 0)  # Shortcut
+        # Yeah this logic is really scuffed, but I really don't have a better way right now
+        start = datetime.datetime.strptime(DATETIME_FORMAT if first_time else DATE_FORMAT,
+                                           input[1] + (input[second_index - 1] if first_time else ''))
+        end = datetime.datetime.strptime(DATETIME_FORMAT if second_time else DATE_FORMAT,
+                                         input[second_index] + (input[second_index + 1] if second_time else ''))
+        return Event(
+                summary=input[0],
+                start=start,
+                end=end
+        )
