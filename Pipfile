@@ -10,6 +10,8 @@ pyqt5 = "*"
 google-api-python-client = "*"
 google-auth-httplib2 = "*"
 google-auth-oauthlib = "*"
+dateutil = "*"
+python-dateutil = "*"
 
 [requires]
 python_version = "3.7"

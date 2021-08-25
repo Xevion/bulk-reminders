@@ -62,6 +62,7 @@ class Calendar(object):
                 # Referencing the primary calendar should be done with the ID 'primary'
                 if entry.get('primary', False):
                     entry['id'] = 'primary'
+
                 yield entry
 
             # Continue loading more calendars
@@ -69,12 +70,12 @@ class Calendar(object):
             if page_token is None:
                 break
 
-    def getEvents(self, calendarID: str) -> None:
+    def getEvents(self, calendarID: str) -> List[Any]:
         now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
-        events_result = self.service.events().list(calendarId=calendarID, timeMin=now,
-                                                   maxResults=10, singleEvents=True,
-                                                   orderBy='startTime').execute()
-        events = events_result.get('items', [])
+        events = self.service.events().list(calendarId=calendarID, timeMin=now,
+                                            maxResults=2500, singleEvents=True,
+                                            orderBy='startTime').execute()
+        return events.get('items', [])
 
     def getCalendarsSimplified(self) -> List[Tuple[str, str]]:
         """Extracts the bare minimum required information from the Calendar."""
