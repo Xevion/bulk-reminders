@@ -3,12 +3,16 @@ from __future__ import print_function
 import datetime
 import os.path
 import traceback
-from typing import Any, Iterator, List, Optional, Tuple
+from typing import Any, Iterator, List, Optional, Tuple, Union
 
+from PyQt5 import QtCore, QtGui
+from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
+from dateutil.parser import isoparse
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import Resource, build
+from tzlocal import get_localzone
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -71,6 +75,7 @@ class Calendar(object):
                 break
 
     def getEvents(self, calendarID: str) -> List[Any]:
+        """Retrieves up to 2500 events for a given calendar ordered by occurrence that happen in the future."""
         now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
         events = self.service.events().list(calendarId=calendarID, timeMin=now,
                                             maxResults=2500, singleEvents=True,
@@ -82,6 +87,50 @@ class Calendar(object):
         return [(calendar['id'], calendar['summary']) for calendar in self.getCalendars()]
 
 
-class Event():
-    def __init__(self, title, date, time):
-        pass
+class Event(object):
+    def __init__(self, summary: str, start: Union[datetime.date, datetime.datetime], end: Union[datetime.date, datetime.datetime],
+                 description: Optional[str] = None):
+        if type(start) != type(end):
+            raise Exception("Both start and end times need to be either simple dates or advanced datetime objects.")
+        self.summary, self.start, self.end, self.description = summary, start, end, description
+
+    @classmethod
+    def from_api(cls, event: dict) -> 'Event':
+        """Returns a Event object from a Google API Engine item."""
+        print(event)
+        return Event(summary=event.get('summary'),
+                     start=isoparse(event['start'].get('dateTime', event['start'].get('date'))),
+                     end=isoparse(event['end'].get('dateTime', event['end'].get('date'))),
+                     description=event.get('description'))
+
+    @property
+    def is_datetime(self) -> bool:
+        """Returns true if the Event object is based on full datetime objects instead of simple date objects."""
+        return type(self.start) is datetime.datetime
+
+    @property
+    def api_start(self) -> dict:
+        """Provides a proper object for the 'start' field in the body of a new event."""
+        if type(self.start) is datetime.date:
+            return {'date': self.start.strftime('%Y-%m-%d')}
+        elif type(self.start) is datetime.datetime:
+            return {'datetime': self.start.astimezone(get_localzone()).isoformat()}
+
+    @property
+    def api_end(self) -> dict:
+        """Provides a proper object for the 'end' field in the body of a new event."""
+        if type(self.end) is datetime.date:
+            return {'date': self.end.strftime('%Y-%m-%d')}
+        elif type(self.end) is datetime.datetime:
+            return {'datetime': self.end.astimezone(get_localzone()).isoformat()}
+
+    def fill_row(self, row: int, table: QTableWidget) -> None:
+        """Fills a specific row on a QTableWidget object with the information stored in the Event object."""
+        summaryItem = QTableWidgetItem(self.summary)
+        summaryItem.setForeground(QtGui.QColor("blue"))
+        table.setItem(row, 0, summaryItem)
+
+        formatString = '%b %d, %Y' if self.start is not None else '%b %d, %Y %I:%M %Z'
+        table.setItem(row, 1, QTableWidgetItem('Foreign'))
+        table.setItem(row, 2, QTableWidgetItem(self.start.strftime(formatString)))
+        table.setItem(row, 3, QTableWidgetItem(self.end.strftime(formatString)))

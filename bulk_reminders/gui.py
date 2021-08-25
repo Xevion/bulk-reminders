@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import QDialog, QMainWindow, QTableWidgetItem
 from dateutil.parser import isoparse
 
 from bulk_reminders import api, undo
+from bulk_reminders.api import Event
 from bulk_reminders.gui_base import Ui_MainWindow
 from bulk_reminders.oauth import OAuthDialog
 
@@ -45,8 +46,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.ResizeToContents)
         self.eventsView.verticalHeader().hide()
 
-        self.undoButton.clicked().connect(self.undoEvents)
-        self.submitButton.clicked().connect(self.submitEvents)
+        self.undoButton.clicked.connect(self.undo)
+        self.submitButton.clicked.connect(self.submit)
 
         # Disable the undo button until undo stages are available
         if len(undo.stages) == 0:
@@ -55,32 +56,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.populate()
 
     def undo(self) -> None:
+        # Get the latest undo stage and delete all events in that stage
         latest = undo.stages.pop(0)
         for entry in latest:
+            self.calendar.service.events().delete(calendarId=entry.get('calendarId'), eventId=entry.get('eventId')).execute()
 
         # Disable the undo button until undo stages are available
         if len(undo.stages) == 0:
             self.undoButton.setDisabled(True)
 
+    def submit(self) -> None:
+        pass
+
+
     def populate(self) -> None:
         """Re-populate the table with all of the events"""
-        self.events = self.calendar.getEvents(self.currentCalendarID)
+        self.events = [Event.from_api(event) for event in self.calendar.getEvents(self.currentCalendarID)]
         self.eventsView.setRowCount(len(self.events))
         for row, event in enumerate(self.events):
-            print(event)
-            summaryItem = QTableWidgetItem(event['summary'])
-            summaryItem.setData(QtCore.Qt.UserRole)
-            summaryItem.setForeground(QtGui.QColor("blue"))
-            self.eventsView.setItem(row, 0, summaryItem)
-            start, end = event['start'], event['end']
-            start, end = start.get('date') or start.get('dateTime'), end.get('date') or end.get('dateTime')
-            start, end = isoparse(start), isoparse(end)
-
-            formatString = '%b %d, %Y'if event['start'].get('date') is not None else '%b %d, %Y %I:%M %Z'
-            self.eventsView.setItem(row, 1, QTableWidgetItem('Foreign'))
-            self.eventsView.setItem(row, 2, QTableWidgetItem(start.strftime(formatString)))
-            self.eventsView.setItem(row, 3, QTableWidgetItem(end.strftime(formatString)))
-
+            event.fill_row(row, self.eventsView)
 
     @QtCore.pyqtSlot(int)
     def comboBoxChanged(self, row) -> None:

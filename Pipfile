@@ -12,6 +12,8 @@ google-auth-httplib2 = "*"
 google-auth-oauthlib = "*"
 dateutil = "*"
 python-dateutil = "*"
+pytz = "*"
+tzlocal = "*"
 
 [requires]
 python_version = "3.7"
