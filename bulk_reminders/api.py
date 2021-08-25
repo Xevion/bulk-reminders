@@ -140,7 +140,7 @@ class Event(object):
         table.setItem(row, 3, QTableWidgetItem(self.end.strftime(formatString)))
 
     @classmethod
-    def parse_raw(self, input: Tuple[str]) -> 'Event':
+    def parse_raw(cls, input: Tuple[str]) -> 'Event':
         """Takes in input that has been separated by a RegEx expression into groups and creates a Event object"""
         first_time = re.match(TIME_REGEX, input[2]) is not None
         second_time = re.match(TIME_REGEX, input[3 + (1 if first_time else 0)])

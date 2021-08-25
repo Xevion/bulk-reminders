@@ -1,6 +1,6 @@
 import os
 import re
-from typing import List
+from typing import List, Optional
 
 from PyQt5.QtCore import QSize, QTimer
 from PyQt5.QtGui import QMovie
@@ -33,16 +33,16 @@ class LoadDialog(QDialog, Ui_Dialog):
         self.parseTimer.timeout.connect(self.parse)
         self.parseTimer.setSingleShot(True)
 
-        self.show()
-        self.parse()
-
         self.parsed: List[Event] = []
+        self.eventCountLabel.setText('0 groups found.')
+
+        self.show()
 
     def parse(self) -> None:
         """Parse the events entered into the dialog"""
         self.spinner.hide()
         results = [result.groups() for result in re.finditer(REGEX, self.plainTextEdit.toPlainText())]
-        self.eventCountLabel.setText(f'{len(results)} group{"s" if len(results) != 0 else ""} found.')
+        self.eventCountLabel.setText(f'{len(results)} group{"s" if len(results) != 1 else ""} found.')
         self.parsed = list(map(Event.parse_raw, results))
 
     def edited(self) -> None:

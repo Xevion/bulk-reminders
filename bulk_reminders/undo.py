@@ -18,3 +18,8 @@ def save() -> None:
 
 if os.path.exists('history.json'):
     load()
+
+
+def getTotal() -> int:
+    """Returns the total number of undoable events known."""
+    return sum(len(stage) for stage in stages)

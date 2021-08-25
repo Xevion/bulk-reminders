@@ -52,6 +52,14 @@ class Ui_MainWindow(object):
         self.calendarCombobox.setMinimumSize(QtCore.QSize(140, 0))
         self.calendarCombobox.setObjectName("calendarCombobox")
         self.horizontalLayout.addWidget(self.calendarCombobox)
+        self.eventCountLabel = QtWidgets.QLabel(self.centralwidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.eventCountLabel.sizePolicy().hasHeightForWidth())
+        self.eventCountLabel.setSizePolicy(sizePolicy)
+        self.eventCountLabel.setObjectName("eventCountLabel")
+        self.horizontalLayout.addWidget(self.eventCountLabel)
         spacerItem = QtWidgets.QSpacerItem(30, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem)
         self.undoButton = QtWidgets.QPushButton(self.centralwidget)
@@ -73,7 +81,8 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Bulk Reminders"))
         self.loadEventsButton.setText(_translate("MainWindow", "Load events"))
         self.submitButton.setText(_translate("MainWindow", "Submit"))
+        self.eventCountLabel.setText(_translate("MainWindow", "34 ready, 26 undoable in 3 stages, 18 prexisting (94)"))
         self.undoButton.setText(_translate("MainWindow", "Undo"))
