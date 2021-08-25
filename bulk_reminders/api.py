@@ -16,6 +16,8 @@ from googleapiclient.discovery import Resource, build
 from tzlocal import get_localzone
 
 # If modifying these scopes, delete the file token.json.
+from bulk_reminders import undo
+
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 TIME_REGEX = re.compile(r'\d{2}:\d{2}(?:AM|PM)')
 DATE_FORMAT = '%Y-%m-%d'
@@ -93,19 +95,29 @@ class Calendar(object):
 
 class Event(object):
     def __init__(self, summary: str, start: Union[datetime.date, datetime.datetime], end: Union[datetime.date, datetime.datetime],
-                 description: Optional[str] = None):
+                 description: Optional[str] = None, status: Optional[str] = None):
         if type(start) != type(end):
             raise Exception("Both start and end times need to be either simple dates or advanced datetime objects.")
-        self.summary, self.start, self.end, self.description = summary, start, end, description
+        self.summary, self.start, self.end, self.description, self.status = summary, start, end, description, status
 
     @classmethod
-    def from_api(cls, event: dict) -> 'Event':
+    def from_api(cls, event: dict, history: Optional[undo.HistoryManager]) -> 'Event':
         """Returns a Event object from a Google API Engine item."""
-        print(event)
+        undo_stage = history.exists(event.get('id')) if history is not None else -1
         return Event(summary=event.get('summary'),
                      start=isoparse(event['start'].get('dateTime', event['start'].get('date'))),
                      end=isoparse(event['end'].get('dateTime', event['end'].get('date'))),
-                     description=event.get('description'))
+                     description=event.get('description'),
+                     status=f'Stage {undo_stage}' if undo_stage != -1 else 'Foreign')
+
+    @property
+    def body(self) -> dict:
+        return {
+            'summary': self.summary,
+            'description': self.description,
+            'start': self.api_start,
+            'end': self.api_end
+        }
 
     @property
     def is_datetime(self) -> bool:
@@ -118,7 +130,7 @@ class Event(object):
         if type(self.start) is datetime.date:
             return {'date': self.start.strftime('%Y-%m-%d')}
         elif type(self.start) is datetime.datetime:
-            return {'datetime': self.start.astimezone(get_localzone()).isoformat()}
+            return {'dateTime': self.start.astimezone(get_localzone()).isoformat()}
 
     @property
     def api_end(self) -> dict:
@@ -126,7 +138,7 @@ class Event(object):
         if type(self.end) is datetime.date:
             return {'date': self.end.strftime('%Y-%m-%d')}
         elif type(self.end) is datetime.datetime:
-            return {'datetime': self.end.astimezone(get_localzone()).isoformat()}
+            return {'dateTime': self.end.astimezone(get_localzone()).isoformat()}
 
     def fill_row(self, row: int, table: QTableWidget) -> None:
         """Fills a specific row on a QTableWidget object with the information stored in the Event object."""
@@ -135,23 +147,19 @@ class Event(object):
         table.setItem(row, 0, summaryItem)
 
         formatString = '%b %d, %Y' if self.start is not None else '%b %d, %Y %I:%M %Z'
-        table.setItem(row, 1, QTableWidgetItem('Foreign'))
+        table.setItem(row, 1, QTableWidgetItem(self.status))
         table.setItem(row, 2, QTableWidgetItem(self.start.strftime(formatString)))
         table.setItem(row, 3, QTableWidgetItem(self.end.strftime(formatString)))
 
     @classmethod
     def parse_raw(cls, input: Tuple[str]) -> 'Event':
         """Takes in input that has been separated by a RegEx expression into groups and creates a Event object"""
-        first_time = re.match(TIME_REGEX, input[2]) is not None
-        second_time = re.match(TIME_REGEX, input[3 + (1 if first_time else 0)])
-        second_index = 2 + (1 if first_time else 0)  # Shortcut
-        # Yeah this logic is really scuffed, but I really don't have a better way right now
-        start = datetime.datetime.strptime(DATETIME_FORMAT if first_time else DATE_FORMAT,
-                                           input[1] + (input[second_index - 1] if first_time else ''))
-        end = datetime.datetime.strptime(DATETIME_FORMAT if second_time else DATE_FORMAT,
-                                         input[second_index] + (input[second_index + 1] if second_time else ''))
+        first_time, second_time = input[2] is not None, input[4] is not None
+        start = datetime.datetime.strptime(input[1] + (input[2] if first_time else ''), DATETIME_FORMAT if first_time else DATE_FORMAT)
+        end = datetime.datetime.strptime(input[3] + (input[4] if second_time else ''), DATETIME_FORMAT if second_time else DATE_FORMAT)
         return Event(
                 summary=input[0],
                 start=start,
-                end=end
+                end=end,
+                status='Ready'
         )
