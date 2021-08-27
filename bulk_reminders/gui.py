@@ -15,6 +15,7 @@ logging.basicConfig(format='[%(asctime)s] [%(levelname)s] [%(threadName)s] %(mes
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
 
+
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, *args, **kwargs):
         # Initial UI setup
@@ -77,22 +78,27 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         dial = LoadDialog()
         dial.plainTextEdit.setPlainText(self.cachedLoadText)
         result = dial.exec()
+
         if result == QMessageBox.Accepted:
             self.cachedLoadText = dial.plainTextEdit.toPlainText()
             self.readyEvents = dial.parsed
             self.populate()
-        elif result == QMessageBox.Cancel:
-            pass
 
     def undo(self) -> None:
-        # Get the latest undo stage and delete all events in that stage
+        """Get the latest undo stage and delete all events in that stage"""
         latest = self.history.pop()
-        for entry in latest.events:
+        logging.info(f'Deleting {len(latest.events)} Events from Calendar {latest.commonCalendar}')
+
+        self.progressBar.show()
+        self.progressBar.setMaximum(len(latest.events))
+        for i, entry in enumerate(latest.events):
+            logging.debug(f'Deleting Event {entry.eventID}')
             self.calendar.service.events().delete(calendarId=entry.calendarID, eventId=entry.eventID).execute()
+            self.progressBar.setValue(i + 1)
+        self.progressBar.hide()
 
         # Disable the undo button until undo stages are available
         self.undoButton.setDisabled(len(self.history) == 0)
-
         self.populate()  # Refresh
 
     def getForeign(self) -> Iterator[IDPair]:
@@ -105,10 +111,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def submit(self) -> None:
         newStage = Stage(index=self.history.nextIndex(), commonCalendar=self.currentCalendarID)
-        while self.readyEvents:
-            event: Event = self.readyEvents.pop(0)
+        logger.info(f'Submitting {len(self.readyEvents)} events to API')
+
+        self.progressBar.show()
+        self.progressBar.setMaximum(len(self.readyEvents))
+        for i, event in enumerate(self.readyEvents):
+            logger.debug(f'Submitting "{event.summary}" scheduled to start on {event.start.isoformat()}....')
             result = self.calendar.service.events().insert(calendarId=self.currentCalendarID, body=event.body).execute()
             newStage.events.append(IDPair(self.currentCalendarID, result.get('id')))
+            self.progressBar.setValue(i + 1)
+
+        self.readyEvents.clear()
+        self.progressBar.hide()
 
         self.history.addStage(newStage)
         self.populate()
@@ -128,6 +142,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         logger.debug(f'Populating table with {self.eventsView.rowCount()} events.')
         for row, event in enumerate(events):
             event.fill_row(row, self.eventsView)
+
+        self.submitButton.setDisabled(len(self.readyEvents) < 0)
 
     @QtCore.pyqtSlot(int)
     def comboBoxChanged(self, row) -> None:

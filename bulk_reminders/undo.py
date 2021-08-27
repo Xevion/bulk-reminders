@@ -31,7 +31,7 @@ class HistoryManager(object):
         """Save data to the undo history file."""
         logger.info('Saving to undo history file.')
         with open(self.file, 'w') as file:
-            file.write(jsonpickle.encode(self.stages))
+            file.write(jsonpickle.encode(self.stages, indent=4))
 
     def getTotal(self) -> int:
         """Returns the total number of undoable events known."""
