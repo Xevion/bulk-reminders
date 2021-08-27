@@ -9,8 +9,18 @@ This is a very small app designed to do that exactly.
 For example, a simple input like such:
 
 ```
-08/23 08/29 "Module 1
+Pre-Test Due | 2021-08-27
+WW Orientation Due | 2021-08-28
+Mod 0.1 Prework Due | 2021-08-29
+Last Day to Late Register | 2021-08-31
+Mod 0.1 WW Homework Due | 2021-09-04
+Mod 0.2 Prework Due | 2021-09-05
+Mock Benchmark | 2021-09-05 2021-09-06
 ```
+
+Is all that is needed to create events on the appropriate days, with the included title.
+
+**[Trello Board](https://trello.com/b/HpcVCoql/bulk-reminders)**
 
 ## Features
 
