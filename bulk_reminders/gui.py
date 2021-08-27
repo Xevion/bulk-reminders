@@ -1,3 +1,4 @@
+import logging
 from typing import Iterator, List
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -10,12 +11,16 @@ from bulk_reminders.load import LoadDialog
 from bulk_reminders.oauth import OAuthDialog
 from bulk_reminders.undo import IDPair, Stage
 
+logging.basicConfig(format='[%(asctime)s] [%(levelname)s] [%(threadName)s] %(message)s')
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.DEBUG)
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, *args, **kwargs):
         # Initial UI setup
         super(MainWindow, self).__init__(*args, **kwargs)
         self.setupUi(self)
+        logger.debug('UI Initialized.')
         self.show()
 
         self.calendar = api.Calendar()
@@ -63,6 +68,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.loadEventsButton.clicked.connect(self.load_events)
         self.cachedLoadText = ''
         self.readyEvents: List[Event] = []
+        self.apiEvents: List[dict] = []
 
         self.populate()
 
@@ -119,6 +125,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.eventCountLabel.setText(f'{len(self.readyEvents)} ready, {undoable} undoable in {stage} stages, {foreign} foreign ({total})')
 
         self.eventsView.setRowCount(len(events))
+        logger.debug(f'Populating table with {self.eventsView.rowCount()} events.')
         for row, event in enumerate(events):
             event.fill_row(row, self.eventsView)
 
@@ -126,4 +133,5 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def comboBoxChanged(self, row) -> None:
         """When the Calendar Selection combobox"""
         self.currentCalendarID = self.comboModel.item(row).data()
+        logger.info(f'Switching to Calendar "{self.comboModel.item(row).text()} ({self.currentCalendarID})"')
         self.populate()

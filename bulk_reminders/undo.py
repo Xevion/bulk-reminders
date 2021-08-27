@@ -1,8 +1,11 @@
-import json
+import logging
 import os
 from typing import Iterator, List
 
 import jsonpickle
+
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.DEBUG)
 
 
 class HistoryManager(object):
@@ -20,11 +23,13 @@ class HistoryManager(object):
 
     def load(self) -> None:
         """Load data from the undo history file"""
+        logger.info('Loading from undo history file.')
         with open(self.file, 'r') as file:
             self.stages = jsonpickle.decode(file.read())
 
     def save(self) -> None:
         """Save data to the undo history file."""
+        logger.info('Saving to undo history file.')
         with open(self.file, 'w') as file:
             file.write(jsonpickle.encode(self.stages))
 
@@ -34,10 +39,10 @@ class HistoryManager(object):
 
     def exists(self, eventID: 'IDPair') -> int:
         """Check if a given Event ID exists anywhere in the undo history data. Returns the stage index or -1 if it wasn't found."""
-        print(f'Checking for {eventID} in undo history')
         for stage in self.stages:
             for undoable in stage.events:
                 if eventID == undoable.eventID:
+                    logger.debug(f'Found Event {eventID} in Stage {stage.index}')
                     return stage.index
         return -1
 
@@ -59,6 +64,7 @@ class HistoryManager(object):
 
     def addStage(self, newStage: 'Stage'):
         """Adds and inserts a new Stage at the start of the history."""
+        logger.debug(f'Adding new stage with {len(newStage)} events.')
         self.stages.insert(0, newStage)
         self.save()
 
@@ -94,4 +100,3 @@ class IDPair(object):
     def __hash__(self):
         """Returns a hash value for the IDPair"""
         return hash((self.calendarID, self.eventID))
-

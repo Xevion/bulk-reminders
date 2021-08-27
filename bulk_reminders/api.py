@@ -1,9 +1,9 @@
 from __future__ import print_function
 
 import datetime
+import logging
 import os.path
 import re
-import traceback
 from typing import Any, Iterator, List, Optional, Tuple, Union
 
 from PyQt5 import QtGui
@@ -23,49 +23,62 @@ TIME_REGEX = re.compile(r'\d{2}:\d{2}(?:AM|PM)')
 DATE_FORMAT = '%Y-%m-%d'
 DATETIME_FORMAT = DATE_FORMAT + ' %H:%M%p'
 
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.DEBUG)
+
 
 class Calendar(object):
+    TOKEN_FILE = 'token.json'
+
     def __init__(self) -> None:
         self.credentials: Optional[Credentials] = None
         self.service: Optional[Resource] = None
 
     def save_token(self) -> None:
         """Store the credentials for later use."""
-        with open('token.json', 'w') as token:
+        logger.debug('Saving token to token.json')
+        with open(Calendar.TOKEN_FILE, 'w') as token:
             token.write(self.credentials.to_json())
 
     def authenticate_via_token(self) -> bool:
         """Attempt to login using the tokens stored in token.json"""
-        if os.path.exists('token.json'):
+        logger.info('Attempting to authenticate via token')
+        if os.path.exists(Calendar.TOKEN_FILE):
             self.credentials = Credentials.from_authorized_user_file('token.json', SCOPES)
             if self.credentials and self.credentials.expired and self.credentials.refresh_token:
                 try:
+                    logger.info('Refreshing token')
                     self.credentials.refresh(Request())
                 except BaseException as e:
-                    traceback.print_exc()
+                    logger.error('Failed to refresh token', exc_info=e)
                     return False
-                self.save_token()
+                else:
+                    logger.info('Successfully authenticated via token')
+                    self.save_token()
             return True
         return False
 
     def authenticate_via_oauth(self) -> bool:
         """Attempt to acquire credentials"""
         try:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             self.credentials = flow.run_local_server(port=0)
-            self.save_token()
         except BaseException as e:
-            traceback.print_exc()
+            logger.error('Failed to authenticate via OAuth 2.0 flow', exc_info=e)
             return False
+        else:
+            self.save_token()
+            return True
 
     def setupService(self) -> None:
         """Setup the Google App Engine API Service for the Calendar API"""
+        logger.debug('Initializing Calendar API Service')
         self.service = build('calendar', 'v3', credentials=self.credentials)
 
     def getCalendars(self) -> Iterator[Any]:
         """Retrieve all calendar data"""
-        page_token = None
+        logger.debug('Retrieving all calendar data')
+        page, page_token = 1, None
         while True:
             calendar_list = self.service.calendarList().list(pageToken=page_token, minAccessRole='writer').execute()
             for entry in calendar_list['items']:
@@ -76,12 +89,16 @@ class Calendar(object):
                 yield entry
 
             # Continue loading more calendars
+            page += 1
             page_token = calendar_list.get('nextPageToken')
             if page_token is None:
                 break
 
+            logger.debug(f'Retrieving page {page} of Calendars')
+
     def getEvents(self, calendarID: str) -> List[Any]:
         """Retrieves up to 2500 events for a given calendar ordered by occurrence that happen in the future."""
+        logger.debug(f'Retrieving all events from Calendar {calendarID}')
         now = datetime.datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
         events = self.service.events().list(calendarId=calendarID, timeMin=now,
                                             maxResults=2500, singleEvents=True,

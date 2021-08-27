@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from typing import List, Optional
@@ -8,6 +9,9 @@ from PyQt5.QtWidgets import QApplication, QDialog, QLabel
 
 from bulk_reminders.api import Event
 from bulk_reminders.load_base import Ui_Dialog
+
+logger = logging.getLogger(__file__)
+logger.setLevel(logging.DEBUG)
 
 REGEX = re.compile(
     r'\s*([\w\d\s,.;\'!\[\]()]{1,})\s+\|\s+(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2}(?:AM|PM))?\s*(\d{4}-\d{2}-\d{2})(\d{1,2}:\d{2}(?:AM|PM))?')
@@ -46,6 +50,7 @@ class LoadDialog(QDialog, Ui_Dialog):
         try:
             self.parsed = list(map(Event.parse_raw, results))
         except ValueError:
+            logger.debug('Dialog input has data errors (invalid dates etc.)')
             resultsText += ' Data error.'
         self.eventCountLabel.setText(resultsText)
 
