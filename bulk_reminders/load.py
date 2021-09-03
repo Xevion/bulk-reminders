@@ -13,8 +13,8 @@ from bulk_reminders.load_base import Ui_Dialog
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
 
-REGEX = re.compile(
-    r'\s*([\w\d\s,-.;\'!\[\]()]{1,})\s+\|\s+(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2}(?:AM|PM))?\s*(\d{4}-\d{2}-\d{2})(\d{1,2}:\d{2}(?:AM|PM))?')
+REGEX_FULL_PARSE = re.compile(
+    r'\s*([\w\d\s,-.;\'!\[\]()]{1,})\s+\|\s+(\d{4}-\d{2}-\d{2})\s*(\d{1,2}:\d{2}(?:AM|PM))?\s*(\d{4}-\d{2}-\d{2})?\s*(\d{1,2}:\d{2}(?:AM|PM))?')
 
 
 class LoadDialog(QDialog, Ui_Dialog):
@@ -45,12 +45,14 @@ class LoadDialog(QDialog, Ui_Dialog):
     def parse(self) -> None:
         """Parse the events entered into the dialog"""
         self.spinner.hide()
-        results = [result.groups() for result in re.finditer(REGEX, self.plainTextEdit.toPlainText())]
+        results = [result.groups() for result in re.finditer(REGEX_FULL_PARSE, self.plainTextEdit.toPlainText())]
         resultsText = f'{len(results)} group{"s" if len(results) != 1 else ""} found.'
         try:
             self.parsed = list(map(Event.parse_raw, results))
-        except ValueError:
-            logger.debug('Dialog input has data errors (invalid dates etc.)')
+            for event in self.parsed:
+                logger.debug(f'Parsed: Event "{event.summary}" starts {event.start} and ends {event.end}')
+        except ValueError as error:
+            logger.warning('Dialog input has data errors (invalid dates etc.)', exc_info=error)
             resultsText += ' Data error.'
         self.eventCountLabel.setText(resultsText)
 

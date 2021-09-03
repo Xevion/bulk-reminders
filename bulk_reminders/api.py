@@ -21,7 +21,7 @@ from bulk_reminders import undo
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 TIME_REGEX = re.compile(r'\d{2}:\d{2}(?:AM|PM)')
 DATE_FORMAT = '%Y-%m-%d'
-DATETIME_FORMAT = DATE_FORMAT + ' %H:%M%p'
+DATETIME_FORMAT = DATE_FORMAT + '%H:%M%p'
 
 logger = logging.getLogger(__file__)
 logger.setLevel(logging.DEBUG)
@@ -171,9 +171,19 @@ class Event(object):
     @classmethod
     def parse_raw(cls, input: Tuple[str]) -> 'Event':
         """Takes in input that has been separated by a RegEx expression into groups and creates a Event object"""
-        first_time, second_time = input[2] is not None, input[4] is not None
+        first_time = input[2] is not None
         start = datetime.datetime.strptime(input[1] + (input[2] if first_time else ''), DATETIME_FORMAT if first_time else DATE_FORMAT)
-        end = datetime.datetime.strptime(input[3] + (input[4] if second_time else ''), DATETIME_FORMAT if second_time else DATE_FORMAT)
+        if input[3] is not None:
+            second_time = input[4] is not None
+            end = datetime.datetime.strptime(input[3] + (input[4] if second_time else ''), DATETIME_FORMAT if second_time else DATE_FORMAT)
+        else:
+            if first_time:
+                # But if a start time (hour & minute) was specified, make it end at the same time
+                end = start
+            else:
+                # If no second date is specified and no first time is either, it simply ends the next day and lasts 24 hours
+                end = start + datetime.timedelta(hours=24)
+
         return Event(
                 summary=input[0],
                 start=start,

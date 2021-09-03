@@ -141,6 +141,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.eventsView.setRowCount(len(events))
         logger.debug(f'Populating table with {self.eventsView.rowCount()} events.')
         for row, event in enumerate(events):
+            logger.debug(f'Event "{event.summary}" starts {event.start} and ends {event.end}')
             event.fill_row(row, self.eventsView)
 
         self.submitButton.setDisabled(len(self.readyEvents) < 0)
