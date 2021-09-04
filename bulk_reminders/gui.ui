@@ -77,7 +77,7 @@
            </sizepolicy>
           </property>
           <property name="text">
-           <string>34 ready, 26 undoable in 3 stages, 18 prexisting (94)</string>
+           <string>0 ready, 0 undoable in 0 stages, 0 prexisting (0)</string>
           </property>
          </widget>
         </item>
