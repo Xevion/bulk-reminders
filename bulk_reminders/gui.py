@@ -1,15 +1,15 @@
 import logging
-from typing import Iterator, List
+from typing import Any, List, Set
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QMainWindow, QMessageBox
 
-from bulk_reminders import api, undo
+from bulk_reminders import api
 from bulk_reminders.api import Event
 from bulk_reminders.gui_base import Ui_MainWindow
 from bulk_reminders.load import LoadDialog
 from bulk_reminders.oauth import OAuthDialog
-from bulk_reminders.undo import IDPair, Stage
+from bulk_reminders.undo import IDPair
 
 logging.basicConfig(format='[%(asctime)s] [%(levelname)s] [%(threadName)s] %(message)s')
 logger = logging.getLogger(__file__)
@@ -60,7 +60,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.undoButton.clicked.connect(self.undo)
         self.submitButton.clicked.connect(self.submit)
 
-        self.history = undo.HistoryManager('history.json')
+        self.history: List[IDPair] = []
+        self.historyCalendarID: str = ''
 
         # Disable the undo button until undo stages are available
         if len(self.history) == 0:
@@ -86,31 +87,31 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def undo(self) -> None:
         """Get the latest undo stage and delete all events in that stage"""
-        latest = self.history.pop()
-        logging.info(f'Deleting {len(latest.events)} Events from Calendar {latest.commonCalendar}')
+        logging.info(f'Deleting {len(self.history)} Events from Calendar {self.historyCalendarID}')
 
         self.progressBar.show()
-        self.progressBar.setMaximum(len(latest.events))
-        for i, entry in enumerate(latest.events):
+        self.progressBar.setMaximum(len(self.history))
+        for i, entry in enumerate(self.history):
             logging.debug(f'Deleting Event {entry.eventID}')
             self.calendar.service.events().delete(calendarId=entry.calendarID, eventId=entry.eventID).execute()
             self.progressBar.setValue(i + 1)
         self.progressBar.hide()
 
         # Disable the undo button until undo stages are available
+        self.history = []
         self.undoButton.setDisabled(len(self.history) == 0)
         self.populate()  # Refresh
 
-    def getForeign(self) -> Iterator[IDPair]:
+    def getForeign(self) -> Set[Any]:
         """Returns all events currently tracked that are not stored in the undo."""
-        undoableIDs = set(self.history.all_pairs())
-        for apiEvent in self.apiEvents:
-            pair = IDPair(calendarID=self.currentCalendarID, eventID=apiEvent['id'])
-            if pair not in undoableIDs:
-                yield pair
+        foreign = {event.get('id'): event for event in self.apiEvents}
+        undoableIDs = set(pair.eventID for pair in self.history)
+        return {foreign[eventID] for eventID in undoableIDs.difference(foreign.keys())}
 
     def submit(self) -> None:
-        newStage = Stage(index=self.history.nextIndex(), commonCalendar=self.currentCalendarID)
+        self.historyCalendarID = self.currentCalendarID
+        self.history = []
+
         logger.info(f'Submitting {len(self.readyEvents)} events to API')
 
         self.progressBar.show()
@@ -118,13 +119,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for i, event in enumerate(self.readyEvents):
             logger.debug(f'Submitting "{event.summary}" scheduled to start on {event.start.isoformat()}....')
             result = self.calendar.service.events().insert(calendarId=self.currentCalendarID, body=event.body).execute()
-            newStage.events.append(IDPair(self.currentCalendarID, result.get('id')))
+            self.history.append(IDPair(self.currentCalendarID, result.get('id')))
             self.progressBar.setValue(i + 1)
 
+        self.undoButton.setDisabled(len(self.history) == 0)
         self.readyEvents.clear()
         self.progressBar.hide()
 
-        self.history.addStage(newStage)
         self.populate()
 
     def populate(self) -> None:
@@ -134,9 +135,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         events = list(self.readyEvents)
         events.extend([Event.from_api(event, self.history) for event in self.apiEvents])
 
-        ready, undoable, stage, foreign = len(self.readyEvents), self.history.getTotal(), len(self.history), len(list(self.getForeign()))
+        ready, undoable, foreign = len(self.readyEvents), len(self.history), len(list(self.getForeign()))
         total = ready + undoable + foreign
-        self.eventCountLabel.setText(f'{len(self.readyEvents)} ready, {undoable} undoable in {stage} stages, {foreign} foreign ({total})')
+        self.eventCountLabel.setText(f'{len(self.readyEvents)} ready, {undoable} undoable, {foreign} foreign ({total})')
 
         self.eventsView.setRowCount(len(events))
         logger.debug(f'Populating table with {self.eventsView.rowCount()} events.')

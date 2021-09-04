@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Iterator, List
+from typing import Any, Iterator, List
 
 import jsonpickle
 
@@ -67,6 +67,13 @@ class HistoryManager(object):
         logger.debug(f'Adding new stage with {len(newStage)} events.')
         self.stages.insert(0, newStage)
         self.save()
+
+    def verify(self, calendarID: str, known_events: List[Any]) -> None:
+        """Given a calendar ID and a list of events from this calendar, make sure there are no IDPairs in storage that no longer exist any more."""
+        pass
+
+    def collapse(self) -> None:
+        pass
 
 
 class Stage(object):

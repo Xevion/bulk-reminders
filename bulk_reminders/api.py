@@ -17,6 +17,7 @@ from tzlocal import get_localzone
 
 # If modifying these scopes, delete the file token.json.
 from bulk_reminders import undo
+from bulk_reminders.undo import IDPair
 
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 TIME_REGEX = re.compile(r'\d{2}:\d{2}(?:AM|PM)')
@@ -118,14 +119,14 @@ class Event(object):
         self.summary, self.start, self.end, self.description, self.status = summary, start, end, description, status
 
     @classmethod
-    def from_api(cls, event: dict, history: Optional[undo.HistoryManager]) -> 'Event':
+    def from_api(cls, event: dict, history: List[IDPair]) -> 'Event':
         """Returns a Event object from a Google API Engine item."""
-        undo_stage = history.exists(event.get('id')) if history is not None else -1
+        in_history = any(pair.eventID == event.get('id') for pair in history)
         return Event(summary=event.get('summary'),
                      start=isoparse(event['start'].get('dateTime', event['start'].get('date'))),
                      end=isoparse(event['end'].get('dateTime', event['end'].get('date'))),
                      description=event.get('description'),
-                     status=f'Stage {undo_stage}' if undo_stage != -1 else 'Foreign')
+                     status='Undoable' if in_history else 'Foreign')
 
     @property
     def body(self) -> dict:
